@@ -10,35 +10,19 @@ import pandas as pd
 import textwrap
 from io import StringIO
 
-# FIX COMPATIBILITY UNTUK PYTHON 3.13 + PILLOW
+# FIX COMPATIBILITY PILLOW
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = getattr(PIL.Image, 'LANCZOS', PIL.Image.BICUBIC)
 
-# FIX IMPORT MOVIEPY (Cara paling aman buat semua versi)
-try:
-    from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip, afx
-except ImportError:
-    try:
-        from moviepy.video.io.VideoFileClip import VideoFileClip
-        from moviepy.audio.io.AudioFileClip import AudioFileClip
-        from moviepy.video.VideoClip import ImageClip
-        from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
-        from moviepy.audio.AudioClip import CompositeAudioClip
-        from moviepy.audio.fx.all import audio_loop as aloop
-        # Helper untuk akses afx di versi baru
-        class afx_dummy:
-            @staticmethod
-            def audio_loop(clip, duration): return aloop(clip, duration=duration)
-        afx = afx_dummy()
-    except Exception as e:
-        st.error(f"Gagal memuat library MoviePy: {e}")
+# FIX IMPORT MOVIEPY SECARA TOTAL
+from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip
 
 import edge_tts
 
 st.set_page_config(page_title="Viral Shorts Factory", layout="wide")
-st.title("💀 Viral Shorts Factory (Stable Build)")
+st.title("💀 Viral Shorts Factory (Final Fix)")
 
-# --- DATABASE HOOKS & STAY LINES (300 ALTERNATIVES LOGIC) ---
+# --- DATABASE HOOKS & STAY LINES ---
 HOOK_DB = {
     "Ego Challenge": [f"Only {random.randint(1,5)}% can solve this." for _ in range(50)],
     "Curiosity Shock": ["This feels illegal to know.", "Your brain is lying to you."] * 50,
@@ -66,7 +50,7 @@ with st.sidebar:
 
 # --- INPUT DATA ---
 st.header("📝 0. Data Kuis")
-quiz_csv = st.text_area("Paste CSV (Format: Pertanyaan,Jawaban)", height=100, placeholder="Who is...?,The King!")
+quiz_csv = st.text_area("Paste CSV (Format: Pertanyaan,Jawaban)", height=100)
 
 col_h, col_s = st.columns(2)
 with col_h: hook_type = st.selectbox("🪝 5. Pilih Jenis Hook", list(HOOK_DB.keys()))
@@ -98,56 +82,55 @@ if st.button("🚀 GENERATE VIDEO", use_container_width=True):
     if not bg_video or not font_file or not quiz_csv:
         st.error("Lengkapi Bahan Dulu!")
     else:
-        with st.spinner("Rendering... (Fixing 0B & Codec Issues)"):
+        with st.spinner("Rendering... (Final Fix Applied)"):
             try:
                 tmp_dir = "/tmp" if os.path.exists("/tmp") else tempfile.gettempdir()
-                
-                # Simpan Font
                 f_font = os.path.join(tmp_dir, "f.ttf")
                 with open(f_font, "wb") as f: f.write(font_file.read())
                 
-                # Pilih Data
+                # Parsing Data
                 data = pd.read_csv(StringIO(quiz_csv), names=["Q", "A"])
                 row = data.iloc[0]
                 sel_hook = random.choice(HOOK_DB[hook_type])
                 sel_stay = random.choice(STAY_DB[stay_type])
                 
-                # Generate Audio
+                # Audio Voiceover
                 v_file = os.path.join(tmp_dir, "v.mp3")
                 script = f"{sel_hook}. {sel_stay}. {row['Q']}. {row['A']}. Watch again."
                 asyncio.run(generate_voice(script, v_file, voice_id))
                 
-                # Video Processing
+                # Video Base
                 bg_path = os.path.join(tmp_dir, "b.mp4")
                 with open(bg_path, "wb") as f: f.write(bg_video.read())
-                
                 clip_bg = VideoFileClip(bg_path).subclip(0, 26).resize(height=1920).crop(x_center=540, width=1080, height=1920)
                 
-                # Layers Teks (Sesuai Struktur)
-                c1 = make_text_clip(sel_hook, f_font, 95, 2, 0) # 0-2s
-                c2 = make_text_clip(sel_stay, f_font, 85, 3, 2, color='yellow') # 2-5s
-                c3 = make_text_clip(row['Q'], f_font, 80, 6, 5) # 5-11s
-                c4 = make_text_clip("3... 2... 1...", f_font, 130, 5, 11) # 11-16s
-                c5 = make_text_clip(row['A'], f_font, 100, 6, 16, color='lime') # 16-22s
-                c6 = make_text_clip("DID YOU GET IT?\nWatch Again", f_font, 75, 4, 22) # 22-26s
+                # Text Clips
+                c1 = make_text_clip(sel_hook, f_font, 95, 2, 0)
+                c2 = make_text_clip(sel_stay, f_font, 85, 3, 2, color='yellow')
+                c3 = make_text_clip(row['Q'], f_font, 80, 6, 5)
+                c4 = make_text_clip("3... 2... 1...", f_font, 130, 5, 11)
+                c5 = make_text_clip(row['A'], f_font, 100, 6, 16, color='lime')
+                c6 = make_text_clip("DID YOU GET IT?\nWatch Again", f_font, 75, 4, 22)
 
-                final = CompositeVideoClip([clip_bg, c1, c2, c3, c4, c5, c6])
+                # Audio Mixing (MANUAL LOOPING)
+                audio_clips = [AudioFileClip(v_file)]
                 
-                # Mix Audio
-                audios = [AudioFileClip(v_file)]
                 if backsound:
                     m_p = os.path.join(tmp_dir, "m.mp3")
                     with open(m_p, "wb") as f: f.write(backsound.read())
-                    audios.append(AudioFileClip(m_p).volumex(0.3).set_duration(26))
+                    # Gunakan loop manual MoviePy yang lebih aman
+                    m_clip = AudioFileClip(m_p).volumex(0.3)
+                    # Loop sederhana:
+                    m_clip = m_clip.fx(lambda c: c.loop(duration=26)) if hasattr(AudioFileClip, 'loop') else m_clip.set_duration(26)
+                    audio_clips.append(m_clip)
                 
-                final = final.set_audio(CompositeAudioClip(audios))
+                final_video = CompositeVideoClip([clip_bg, c1, c2, c3, c4, c5, c6])
+                final_video = final_video.set_audio(CompositeAudioClip(audio_clips).set_duration(26))
                 
-                # RENDER DENGAN FIX ENCODING
-                out_file = os.path.join(tmp_dir, "out.mp4")
-                final.write_videofile(out_file, codec="libx264", audio_codec="aac", fps=24, 
-                                     preset="ultrafast", ffmpeg_params=["-pix_fmt", "yuv420p"])
+                # Render
+                out_file = os.path.join(tmp_dir, "final_fix.mp4")
+                final_video.write_videofile(out_file, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", ffmpeg_params=["-pix_fmt", "yuv420p"])
                 
-                # LOCK TO MEMORY (Anti-0B)
                 with open(out_file, "rb") as f:
                     v_bytes = f.read()
                 
@@ -156,4 +139,4 @@ if st.button("🚀 GENERATE VIDEO", use_container_width=True):
                 st.video(v_bytes)
                 
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error detail: {e}")
