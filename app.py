@@ -10,17 +10,26 @@ import pandas as pd
 import textwrap
 from io import StringIO
 
-# FIX COMPATIBILITY PILLOW
+# FIX COMPATIBILITY PILLOW UNTUK PYTHON 3.13
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = getattr(PIL.Image, 'LANCZOS', PIL.Image.BICUBIC)
 
-# FIX IMPORT MOVIEPY SECARA TOTAL
-from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip
+# FIX IMPORT MOVIEPY V2.0+ (Universal Way)
+try:
+    # Coba cara lama dulu
+    from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip
+except ImportError:
+    # Jika gagal, tembak langsung ke folder barunya di MoviePy v2.x
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
+    from moviepy.video.VideoClip import ImageClip
+    from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+    from moviepy.audio.AudioClip import CompositeAudioClip
 
 import edge_tts
 
 st.set_page_config(page_title="Viral Shorts Factory", layout="wide")
-st.title("💀 Viral Shorts Factory (Final Fix)")
+st.title("💀 Viral Shorts Factory (V2 Compatibility Fix)")
 
 # --- DATABASE HOOKS & STAY LINES ---
 HOOK_DB = {
@@ -82,7 +91,7 @@ if st.button("🚀 GENERATE VIDEO", use_container_width=True):
     if not bg_video or not font_file or not quiz_csv:
         st.error("Lengkapi Bahan Dulu!")
     else:
-        with st.spinner("Rendering... (Final Fix Applied)"):
+        with st.spinner("Rendering... (Universal Fix Applied)"):
             try:
                 tmp_dir = "/tmp" if os.path.exists("/tmp") else tempfile.gettempdir()
                 f_font = os.path.join(tmp_dir, "f.ttf")
@@ -112,29 +121,25 @@ if st.button("🚀 GENERATE VIDEO", use_container_width=True):
                 c5 = make_text_clip(row['A'], f_font, 100, 6, 16, color='lime')
                 c6 = make_text_clip("DID YOU GET IT?\nWatch Again", f_font, 75, 4, 22)
 
-                # Audio Mixing (MANUAL LOOPING)
+                # Audio Mixing
                 audio_clips = [AudioFileClip(v_file)]
-                
                 if backsound:
                     m_p = os.path.join(tmp_dir, "m.mp3")
                     with open(m_p, "wb") as f: f.write(backsound.read())
-                    # Gunakan loop manual MoviePy yang lebih aman
-                    m_clip = AudioFileClip(m_p).volumex(0.3)
-                    # Loop sederhana:
-                    m_clip = m_clip.fx(lambda c: c.loop(duration=26)) if hasattr(AudioFileClip, 'loop') else m_clip.set_duration(26)
+                    m_clip = AudioFileClip(m_p).volumex(0.3).set_duration(26)
                     audio_clips.append(m_clip)
                 
                 final_video = CompositeVideoClip([clip_bg, c1, c2, c3, c4, c5, c6])
                 final_video = final_video.set_audio(CompositeAudioClip(audio_clips).set_duration(26))
                 
                 # Render
-                out_file = os.path.join(tmp_dir, "final_fix.mp4")
+                out_file = os.path.join(tmp_dir, "final_stable.mp4")
                 final_video.write_videofile(out_file, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", ffmpeg_params=["-pix_fmt", "yuv420p"])
                 
                 with open(out_file, "rb") as f:
                     v_bytes = f.read()
                 
-                st.success("✅ Selesai!")
+                st.success("✅ Render Berhasil!")
                 download_area.download_button("📥 DOWNLOAD VIDEO", v_bytes, "viral_shorts.mp4", "video/mp4", type="primary", use_container_width=True)
                 st.video(v_bytes)
                 
