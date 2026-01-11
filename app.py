@@ -92,7 +92,13 @@ def make_text_clip(text, font_path, fontsize, duration, start_time, color='white
     tx, ty = (W-(r-l))/2, (H-(b-t))/2
     draw.rectangle([tx-25, ty-25, tx+(r-l)+25, ty+(b-t)+25], fill=bg_color)
     draw.multiline_text((tx, ty), wrapped, font=font, fill=color, align='center')
-    return ImageClip(np.array(img)).with_start(start_time).with_duration(duration).with_position(('center', 'center'))
+    
+    clip = ImageClip(np.array(img))
+    # FIX START & DURATION V2
+    if hasattr(clip, 'with_start'): clip = clip.with_start(start_time).with_duration(duration)
+    else: clip = clip.set_start(start_time).set_duration(duration)
+    
+    return clip.set_position(('center', 'center'))
 
 def slugify(text):
     text = re.sub(r'[^\w\s-]', '', text).strip().lower()
@@ -132,7 +138,7 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                 
                 clip_bg = clip_bg.crop(x_center=540, width=1080, height=1920)
                 
-                # 3. Text Layers (V2 Uses .with_start)
+                # 3. Text Layers
                 c1 = make_text_clip(random.choice(HOOK_DB[hook_type]), f_font, 95, 2, 0)
                 c2 = make_text_clip(random.choice(STAY_DB[stay_type]), f_font, 85, 3, 2, color='yellow')
                 c3 = make_text_clip(pertanyaan, f_font, 80, 6, 5)
@@ -148,14 +154,27 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                 if backsound:
                     m_p = os.path.join(tmp_dir, "m.mp3")
                     with open(m_p, "wb") as f: f.write(backsound.read())
-                    m_clip = AudioFileClip(m_p).with_duration(26).volumex(0.3)
+                    m_clip = AudioFileClip(m_p).volumex(0.3)
+                    # Loop / Duration Fix
+                    if hasattr(m_clip, 'with_duration'): m_clip = m_clip.with_duration(26)
+                    else: m_clip = m_clip.set_duration(26)
                     mixed_audios.append(m_clip)
                 if timer_sfx:
                     s_p = os.path.join(tmp_dir, "s.mp3")
                     with open(s_p, "wb") as f: f.write(timer_sfx.read())
-                    mixed_audios.append(AudioFileClip(s_p).with_start(11).with_duration(5))
+                    s_clip = AudioFileClip(s_p)
+                    # Start Fix
+                    if hasattr(s_clip, 'with_start'): s_clip = s_clip.with_start(11).with_duration(5)
+                    else: s_clip = s_clip.set_start(11).set_duration(5)
+                    mixed_audios.append(s_clip)
                 
-                final_video = final_video.with_audio(CompositeAudioClip(mixed_audios).with_duration(26))
+                # Final Mix
+                final_audio = CompositeAudioClip(mixed_audios)
+                if hasattr(final_audio, 'with_duration'): final_audio = final_audio.with_duration(26)
+                else: final_audio = final_audio.set_duration(26)
+                
+                if hasattr(final_video, 'with_audio'): final_video = final_video.with_audio(final_audio)
+                else: final_video = final_video.set_audio(final_audio)
                 
                 # 5. Export
                 out_file = os.path.join(tmp_dir, "final.mp4")
