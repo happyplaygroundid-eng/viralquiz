@@ -14,7 +14,7 @@ from io import StringIO
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = getattr(PIL.Image, 'LANCZOS', PIL.Image.BICUBIC)
 
-# IMPORT MOVIEPY DENGAN TRY-EXCEPT UNTUK SEMUA VERSI
+# IMPORT MOVIEPY UNIVERSAL
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip
 except ImportError:
@@ -27,7 +27,7 @@ except ImportError:
 import edge_tts
 
 st.set_page_config(page_title="Viral Shorts Factory", layout="wide")
-st.title("💀 Viral Shorts Factory (Final Compatibility)")
+st.title("💀 Viral Shorts Factory (V3.0 Final Compatibility)")
 
 # --- DATABASE ---
 HOOK_DB = {
@@ -89,7 +89,7 @@ def make_text_clip(text, font_path, fontsize, duration, start_time, color='white
     draw.multiline_text((tx, ty), wrapped, font=font, fill=color, align='center')
     
     clip = ImageClip(np.array(img))
-    # Versi-Agnostic Start & Duration
+    # LOGIKA KOMPATIBILITAS WAKTU
     if hasattr(clip, 'with_start'):
         clip = clip.with_start(start_time).with_duration(duration)
     else:
@@ -109,24 +109,24 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                 pertanyaan = selected_row['Pertanyaan']
                 jawaban = selected_row['Jawaban']
                 
-                # Voice
+                # 1. Voice
                 v_file = os.path.join(tmp_dir, "v.mp3")
                 script = f"{random.choice(HOOK_DB[hook_type])}. {random.choice(STAY_DB[stay_type])}. {pertanyaan}. {jawaban}. Watch again."
                 asyncio.run(generate_voice(script, v_file, voice_id))
                 
-                # Background Video
+                # 2. Background Video
                 bg_path = os.path.join(tmp_dir, "b.mp4")
                 with open(bg_path, "wb") as f: f.write(bg_video.read())
                 
                 clip_bg = VideoFileClip(bg_path)
                 
-                # LOGIKA DETEKSI VERSI UNTUK SUBCLIP/CUT
+                # FIX ATRIBUT 'SUBCLIP' VS 'CUT'
                 if hasattr(clip_bg, 'cut'):
                     clip_bg = clip_bg.cut(0, 26)
                 else:
                     clip_bg = clip_bg.subclip(0, 26)
                 
-                # Resize
+                # FIX ATRIBUT 'RESIZED' VS 'RESIZE'
                 if hasattr(clip_bg, 'resized'):
                     clip_bg = clip_bg.resized(height=1920)
                 else:
@@ -134,7 +134,7 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                     
                 clip_bg = clip_bg.crop(x_center=540, width=1080, height=1920)
                 
-                # Text Layers
+                # 3. Layers
                 c1 = make_text_clip(random.choice(HOOK_DB[hook_type]), f_font, 95, 2, 0)
                 c2 = make_text_clip(random.choice(STAY_DB[stay_type]), f_font, 85, 3, 2, color='yellow')
                 c3 = make_text_clip(pertanyaan, f_font, 80, 6, 5)
@@ -142,7 +142,7 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                 c5 = make_text_clip(jawaban, f_font, 100, 6, 16, color='lime')
                 c6 = make_text_clip("DID YOU GET IT?\nWatch Again", f_font, 75, 4, 22)
 
-                # Audio
+                # 4. Audio Mixing
                 audio_clips = [AudioFileClip(v_file)]
                 if backsound:
                     m_p = os.path.join(tmp_dir, "m.mp3")
@@ -165,19 +165,20 @@ if st.button("🚀 MULAI GENERATE VIDEO", use_container_width=True):
                 
                 final_video = CompositeVideoClip([clip_bg, c1, c2, c3, c4, c5, c6])
                 
+                # FIX AUDIO SETTING
                 if hasattr(final_video, 'with_audio'):
                     final_video = final_video.with_audio(final_audio)
                 else:
                     final_video = final_video.set_audio(final_audio)
                 
-                # Export
+                # 5. Export
                 out_file = os.path.join(tmp_dir, "final.mp4")
                 final_video.write_videofile(out_file, codec="libx264", audio_codec="aac", fps=24, preset="ultrafast", ffmpeg_params=["-pix_fmt", "yuv420p"])
                 
                 with open(out_file, "rb") as f:
                     v_bytes = f.read()
                 
-                # Slugify nama file dari pertanyaan
+                # Nama file otomatis (Slugify)
                 clean_name = re.sub(r'[^\w\s-]', '', pertanyaan).strip().lower()
                 clean_name = re.sub(r'[-\s]+', '_', clean_name)[:50] + ".mp4"
                 
