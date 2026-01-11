@@ -1,0 +1,24 @@
+# Python temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit folders
+.streamlit/
+
+# Temporary media files (Penting!)
+# Ini supaya video hasil render nggak ikutan ke-upload ke GitHub
+*.mp4
+*.mp3
+*.wav
+*.ttf
+outputs/
+temp/
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# MacOS files
+.DS_Store
